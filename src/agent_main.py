@@ -25,14 +25,21 @@ def main():
     print("Confidence:", recommendation["confidence"])
     print("Explanation:", recommendation["explanation"])
 
-    # Optional: write the recommendation back to ServiceNow
-    if "sys_id" in recommendation:
-        update_incident_ai_recommendation(
-            recommendation["sys_id"],
-            recommendation,
-        )
+    # Human-in-the-loop approval
+    approval = input(
+        "\nApprove this recommendation? (y/n): "
+    ).strip().lower()
 
-        print("\nRecommendation written to ServiceNow.")
+    if approval != "y":
+        print("\nRecommendation rejected. No ServiceNow changes made.")
+        return
+
+    update_incident_ai_recommendation(
+        recommendation["sys_id"],
+        recommendation,
+    )
+
+    print("\nRecommendation approved and written to ServiceNow.")
 
 
 if __name__ == "__main__":

@@ -34,13 +34,14 @@ def get_access_token():
     return response.json()["access_token"]
 
 
-def get_incidents(limit=5):
+def get_incident(number):
     access_token = get_access_token()
 
     url = f"{INSTANCE_URL}/api/now/table/incident"
 
     params = {
-        "sysparm_limit": limit,
+        "sysparm_query": f"number={number}",
+        "sysparm_limit": 1,
         "sysparm_fields": (
             "sys_id,number,short_description,description,"
             "priority,state,category,assignment_group"
@@ -59,11 +60,14 @@ def get_incidents(limit=5):
         timeout=30,
     )
 
-    print("Incident status:", response.status_code)
-
     response.raise_for_status()
 
-    return response.json()["result"]
+    results = response.json()["result"]
+
+    if not results:
+        return None
+
+    return results[0]
 
 
 def update_incident_ai_recommendation(sys_id, recommendation):
@@ -92,6 +96,39 @@ def update_incident_ai_recommendation(sys_id, recommendation):
     )
 
     print("Update status:", response.status_code)
+
+    response.raise_for_status()
+
+    return response.json()["result"]
+
+def search_incidents(query, limit=5):
+    access_token = get_access_token()
+
+    url = f"{INSTANCE_URL}/api/now/table/incident"
+
+    params = {
+        "sysparm_query": (
+            f"short_descriptionLIKE{query}"
+            f"^ORdescriptionLIKE{query}"
+        ),
+        "sysparm_limit": limit,
+        "sysparm_fields": (
+            "sys_id,number,short_description,description,"
+            "priority,state,category"
+        ),
+    }
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        params=params,
+        timeout=30,
+    )
 
     response.raise_for_status()
 
