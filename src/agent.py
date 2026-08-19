@@ -8,6 +8,7 @@ from src.servicenow_client import (
 
 from src.knowledge import search_knowledge
 from src.claude_client import API_KEY
+from src.logger import logger
 
 
 client = Anthropic(api_key=API_KEY)
@@ -48,7 +49,6 @@ TOOLS = [
 
 
 def execute_tool(name, tool_input):
-
     if name == "search_incidents":
         return search_incidents(tool_input["query"])
 
@@ -56,6 +56,20 @@ def execute_tool(name, tool_input):
         return search_knowledge(tool_input["query"])
 
     raise ValueError(f"Unknown tool: {name}")
+
+
+def execute_write_action(recommendation, approved=False):
+    if not approved:
+        raise PermissionError(
+            "Human approval is required before modifying ServiceNow."
+        )
+
+    from src.servicenow_client import update_incident_ai_recommendation
+
+    return update_incident_ai_recommendation(
+        recommendation["sys_id"],
+        recommendation,
+    )
 
 
 def investigate_incident(number):
@@ -68,6 +82,11 @@ def investigate_incident(number):
     print(
         f"Investigating: {incident['number']} - "
         f"{incident['short_description']}"
+    )
+
+    logger.info(
+        "Investigation started | incident=%s",
+        incident["number"],
     )
 
     messages = [
@@ -83,7 +102,13 @@ def investigate_incident(number):
         }
     ]
 
-    while True:
+    max_rounds = 6
+
+    for round_number in range(max_rounds):
+        print(
+            f"\nAgent round {round_number + 1}/{max_rounds}"
+        )
+
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1000,
@@ -102,8 +127,8 @@ def investigate_incident(number):
             if block.type == "tool_use"
         ]
 
-        # Claude has finished using tools.
-        # Generate the final structured recommendation.
+        # If Claude is done using tools,
+        # generate the final structured recommendation.
         if not tool_uses:
             final_response = client.messages.create(
                 model="claude-sonnet-4-6",
@@ -112,8 +137,9 @@ def investigate_incident(number):
                     {
                         "role": "user",
                         "content": (
-                            "Using the investigation above, produce the final "
-                            "incident triage recommendation."
+                            "Using the investigation above, "
+                            "produce the final incident "
+                            "triage recommendation."
                         ),
                     }
                 ],
@@ -156,11 +182,23 @@ def investigate_incident(number):
                 }
             )
 
-            return json.loads(
+            recommendation = json.loads(
                 final_response.content[0].text
             )
 
-        # Execute any tools Claude requested.
+            logger.info(
+                "Recommendation generated | "
+                "incident=%s | category=%s | "
+                "priority=%s | confidence=%s",
+                incident["number"],
+                recommendation["category"],
+                recommendation["priority"],
+                recommendation["confidence"],
+            )
+
+            return recommendation
+
+        # Claude requested tools.
         tool_results = []
 
         for tool_use in tool_uses:
@@ -169,10 +207,28 @@ def investigate_incident(number):
                 f"with {tool_use.input}"
             )
 
-            result = execute_tool(
+            logger.info(
+                "Tool called | tool=%s | input=%s",
                 tool_use.name,
                 tool_use.input,
             )
+
+            try:
+                result = execute_tool(
+                    tool_use.name,
+                    tool_use.input,
+                )
+            except Exception as e:
+                result = {
+                    "error": str(e),
+                    "tool": tool_use.name,
+                }
+
+                logger.error(
+                    "Tool failed | tool=%s | error=%s",
+                    tool_use.name,
+                    str(e),
+                )
 
             tool_results.append({
                 "type": "tool_result",
@@ -180,7 +236,20 @@ def investigate_incident(number):
                 "content": json.dumps(result),
             })
 
+        # Give tool results back to Claude.
         messages.append({
             "role": "user",
             "content": tool_results,
         })
+
+    # Claude kept requesting tools for all 6 rounds.
+    logger.error(
+        "Agent exceeded maximum rounds | incident=%s | rounds=%s",
+        incident["number"],
+        max_rounds,
+    )
+
+    raise RuntimeError(
+        f"Agent exceeded maximum of "
+        f"{max_rounds} investigation rounds."
+    )

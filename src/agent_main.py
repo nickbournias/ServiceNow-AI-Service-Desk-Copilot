@@ -1,6 +1,6 @@
-from src.agent import investigate_incident
+from src.agent import investigate_incident, execute_write_action
 from src.claude_client import validate_recommendation
-from src.servicenow_client import update_incident_ai_recommendation
+from src.logger import logger
 
 
 def main():
@@ -31,15 +31,31 @@ def main():
     ).strip().lower()
 
     if approval != "y":
-        print("\nRecommendation rejected. No ServiceNow changes made.")
+        logger.info(
+            "Recommendation rejected | incident=%s",
+            incident_number,
+        )
+
+        print(
+            "\nRecommendation rejected. "
+            "No ServiceNow changes made."
+        )
         return
 
-    update_incident_ai_recommendation(
-        recommendation["sys_id"],
+    # Human approved the write action
+    execute_write_action(
         recommendation,
+        approved=True,
     )
 
-    print("\nRecommendation approved and written to ServiceNow.")
+    logger.info(
+        "Recommendation approved | incident=%s",
+        incident_number,
+    )
+
+    print(
+        "\nRecommendation approved and written to ServiceNow."
+    )
 
 
 if __name__ == "__main__":
