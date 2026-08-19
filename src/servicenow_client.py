@@ -62,3 +62,35 @@ def get_incidents(limit=5):
     response.raise_for_status()
 
     return response.json()["result"]
+
+
+def update_incident_ai_recommendation(sys_id, recommendation):
+    access_token = get_access_token()
+
+    url = f"{INSTANCE_URL}/api/now/table/incident/{sys_id}"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "u_ai_recommended_category": recommendation["category"],
+        "u_ai_recommended_priority": recommendation["priority"],
+        "u_ai_confidence": recommendation["confidence"],
+        "u_ai_explanation": recommendation["explanation"],
+    }
+
+    response = requests.patch(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=30,
+    )
+
+    print("Update status:", response.status_code)
+
+    response.raise_for_status()
+
+    return response.json()["result"]
