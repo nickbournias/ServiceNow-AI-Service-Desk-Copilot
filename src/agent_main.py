@@ -1,4 +1,4 @@
-from src.agent import investigate_incident, execute_write_action
+from src.agent import execute_write_action, investigate_incident
 from src.claude_client import validate_recommendation
 from src.logger import logger
 

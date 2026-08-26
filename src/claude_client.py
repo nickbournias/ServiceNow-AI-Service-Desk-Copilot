@@ -1,5 +1,6 @@
-import os
 import json
+import os
+
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
@@ -88,6 +89,3 @@ def validate_recommendation(recommendation):
 
     return recommendation
 
-
-
-    

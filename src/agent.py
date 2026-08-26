@@ -1,15 +1,14 @@
 import json
+
 from anthropic import Anthropic
 
+from src.claude_client import API_KEY
+from src.knowledge import search_knowledge
+from src.logger import logger
 from src.servicenow_client import (
     get_incident,
     search_incidents,
 )
-
-from src.knowledge import search_knowledge
-from src.claude_client import API_KEY
-from src.logger import logger
-
 
 client = Anthropic(api_key=API_KEY)
 

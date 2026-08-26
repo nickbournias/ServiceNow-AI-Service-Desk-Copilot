@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 KNOWLEDGE_DIR = Path("data/knowledge")
 
 
